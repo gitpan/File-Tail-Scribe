@@ -10,9 +10,12 @@ use FindBin ();
 use File::Basename ();
 use File::Spec::Functions;
 use Pod::Usage;
+use Sys::Hostname;
+use YAML::Any;
 
 my $script = File::Basename::basename($0);
 my $SELF = catfile $FindBin::Bin, $script;
+my @saved_argv = @ARGV;
 
 my $sigset = POSIX::SigSet->new();
 my $hup = POSIX::SigAction->new('sigHUP_handler',
@@ -28,8 +31,8 @@ POSIX::sigaction(&POSIX::SIGQUIT, $term);
 
 my @cat_re;
 my %args = (
-    config => '/etc/sysconfig/tail_to_scribe',
-    dir => [ '/var/log/httpd' ],
+    config => '/etc/tail_to_scribe.conf',
+    dirs => [ '/var/log/httpd' ],
     filter => '[._]log$',
     'exclude-dir' => [],
     'exclude-re' => [],
@@ -65,6 +68,7 @@ GetOptions(\%args,
 	   'retry-buffer-size=i',
 	   'retry-count=i',
 	   'retry-delay=i',
+	   'state-file-name=s',
 	   'debug:s',
 	   'daemon',
 	   "help|?",
@@ -90,6 +94,7 @@ if (defined $args{debug}) {
 my @excludes = @{$args{'exclude-dir'}};
 push(@excludes, map { qr/$_/ } @{$args{'exclude-re'}});
 
+my $hostname = hostname();
 my $msg_filter = sub {
     my $self = shift;
     my $filename = shift;
@@ -98,15 +103,12 @@ my $msg_filter = sub {
     $filename =~ s{(?:[._-]access)?[._-][^._-]*$}{}; # remove extension
     $filename ||= 'default';                  # in case everything gets removed
 
-    return ('info', 'httpd', "$filename\t$line");
+    return ('info', 'httpd', "$hostname\t$filename\t$line");
 };
 
 if ( -f $args{config} ) {
-    unless ( my $ret = do $args{config} ) {
-	die "Failed to parse \"$args{config}\": $@" if $@;
-	die "Failed to load \"$args{config}\": $!" unless defined $ret;
-	die "Failed to run \"$args{config}\"" unless $ret;
-    }
+    eval `cat $args{config}`;
+    die "Failed to load \"$args{config}\": $@" if $@;
 }
 
 if ($args{daemon}) {
@@ -116,6 +118,10 @@ if ($args{daemon}) {
     exit if $pid;
     POSIX::setsid() or die "Can't start a new session: $!";
     open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
+}
+
+if ($debug) {
+    print "Command line arguments\n " . Dump(\%args) . "===\n";
 }
 
 my $log = File::Tail::Scribe->new(
@@ -146,7 +152,7 @@ $log->watch_files();
 
 sub sigHUP_handler {
     $log->save_state();
-    exec($SELF, @ARGV) or die "Couldn't restart: $!\n";
+    exec($SELF, @saved_argv) or die "Couldn't restart: $!\n";
 }
 
 sub sigTERM_handler {
@@ -259,7 +265,7 @@ Enable debugging to standard error or to file.
 =head2 --config=CONFIG_FILE
 
 Specify the location of the configuration file (an included perl script).
-Defaults to /etc/sysconfig/tail_to_scribe.  A typical configuration file might
+Defaults to /etc/tail_to_scribe.conf.  A typical configuration file might
 look like this:
 
   # Set my arg values

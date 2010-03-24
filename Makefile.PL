@@ -22,6 +22,7 @@ WriteMakefile(
 	'Moose' => 0,
 	'POSIX' => 0,
 	'Pod::Usage' => 0,
+	'Sys::Hostname' => 0,
         'Test::MockObject' => 0,
         'Test::More' => 0,
     },
