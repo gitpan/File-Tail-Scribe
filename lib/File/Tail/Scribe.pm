@@ -4,7 +4,7 @@ use Log::Dispatch::Scribe;
 use Moose;
 extends "File::Tail::Dir";
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 has scribe_options => (
     is => 'ro',

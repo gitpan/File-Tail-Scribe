@@ -12,6 +12,7 @@ use File::Spec::Functions;
 use Pod::Usage;
 use Sys::Hostname;
 use YAML::Any;
+use Proc::ProcessTable;
 
 my $script = File::Basename::basename($0);
 my $SELF = catfile $FindBin::Bin, $script;
@@ -71,6 +72,7 @@ GetOptions(\%args,
 	   'state-file-name=s',
 	   'debug:s',
 	   'daemon',
+	   'pidfile=s',
 	   "help|?",
            ) or pod2usage(-exitval => 2, -verbose => 0);
 
@@ -111,6 +113,8 @@ if ( -f $args{config} ) {
     die "Failed to load \"$args{config}\": $@" if $@;
 }
 
+check_pid($args{pidfile}) if $args{pidfile};
+
 if ($args{daemon}) {
     open STDIN, '/dev/null' or die "Can't read /dev/null: $!";
     open STDOUT, '>/dev/null' or die "Can't write to /dev/null: $!";
@@ -118,6 +122,12 @@ if ($args{daemon}) {
     exit if $pid;
     POSIX::setsid() or die "Can't start a new session: $!";
     open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
+}
+
+write_pid($args{pidfile}) if $args{pidfile};
+
+END {
+    cleanup_pid($args{pidfile});
 }
 
 if ($debug) {
@@ -157,9 +167,44 @@ sub sigHUP_handler {
 
 sub sigTERM_handler {
     $log->save_state();
+    cleanup_pid($args{pidfile});
     exit();
 }
-    
+
+sub read_pid {
+    my $pidfile = shift;
+    open my $fh, '<', $pidfile or return;
+    my $pid = <$fh>;
+    close($fh);
+    chomp $pid if $pid;
+    return $pid;
+}
+
+sub write_pid {
+    my $pidfile = shift;
+    open my $fh, '>', $pidfile or die "Failed to open $pidfile for writing: $!";
+    print $fh "$$\n";
+    close($fh);
+}
+
+sub check_pid {
+    my $pidfile = shift;
+    my $pid = read_pid($pidfile) or return;
+    my $t = Proc::ProcessTable->new();
+    for my $p ( @{$t->table} ) {
+	if ($p->pid == $pid && $p->cmndline =~ m/tail_to_scribe/) {
+	    die "tail_to_scribe is already running, PID $pid, pidfile $pidfile\n";
+	}
+    }
+}
+
+sub cleanup_pid {
+    my $pidfile = shift;
+    if ($pidfile && (my $pid = read_pid($pidfile)) ) {
+	unlink $pidfile if $pid == $$;
+    }
+}
+
 __END__
 
 =head1 NAME
@@ -257,6 +302,13 @@ emergency).
 See L<Log::Dispatch::Scribe> for full description of these options.
 
 =back
+
+=head2 --pidfile=FILE
+
+Write process ID to file FILE.  tail_to_scribe.pl will use this file to check if
+an instance is already running, and refuse to start if the PID in this file
+corresponds to another tail_to_scribe.pl process.  Checks are skipped if no
+pidfile is given.
 
 =head2 --debug, --debug=FILE
 

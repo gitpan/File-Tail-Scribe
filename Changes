@@ -7,3 +7,6 @@ Revision history for File-Tail-Scribe
 	Changed default --config option
 	Fixed missing --state-file-name option
 	Added hostname to output messages
+
+0.12	2010-03-26
+	Added --pidfile option
