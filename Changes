@@ -10,3 +10,7 @@ Revision history for File-Tail-Scribe
 
 0.12	2010-03-26
 	Added --pidfile option
+
+0.13	2010-04-07
+	Removed unnecessary 00-load.t
+	Small doc fixes

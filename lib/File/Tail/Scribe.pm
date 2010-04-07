@@ -4,7 +4,7 @@ use Log::Dispatch::Scribe;
 use Moose;
 extends "File::Tail::Dir";
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 has scribe_options => (
     is => 'ro',
@@ -96,6 +96,13 @@ It monitors files in a given directory (or set of directories), such as Apache
 log files in /var/log/httpd, and as the log files are written to, takes the
 changes and sends them to a running instance of the Scribe logging system.
 
+=head1 PREREQUISITES
+
+The Scribe and Thrift Perl modules from their respective source distributions
+are required and not available as CPAN dependencies.  Further information is
+available here:
+<http://notes.jschutz.net/109/perl/perl-client-for-facebooks-scribe-logging-software>
+
 =head1 CONSTRUCTOR
 
 =head2 new
@@ -180,7 +187,7 @@ Set/get the L</msg_filter> and L</default_level> attributes as described above.
 
 =head1 AUTHOR
 
-Jon Schutz, C<< <jon at jschutz.net> >>  L<notes.jschutz.net>
+Jon Schutz, C<< <jon at jschutz.net> >>  L<http://notes.jschutz.net>
 
 =head1 BUGS
 
